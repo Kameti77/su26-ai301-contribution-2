@@ -4,7 +4,7 @@
 **Contribution Number:** 2 
 **Student:** Kameti Kumbi
 **Issue:** https://github.com/nexu-io/open-design/issues/5370#issuecomment-4928544248  
-**Status:** [Phase I ] [In Progress]
+**Status:** [Phase I ] [Complete]
 
 ---
 
