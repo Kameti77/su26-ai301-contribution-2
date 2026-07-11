@@ -17,72 +17,62 @@ I chose this issue because it's a small, clearly-scoped frontend bug that fits m
 ## Understanding the Issue
 
 ### Problem Description
-
-[In your own words, what's broken or missing?]
+The placeholder text in the composer input box (the hint/prompt text shown before real typing happens) gets cut off after just one line, even though there's more visible space in the box. This only affects the placeholder — text you actually type or paste works fine.
 
 ### Expected Behavior
-
-[What should happen?]
+The placeholder should use the space available in the composer box, wrapping across a few lines if needed, and only get cut off with "..." if it's still too long after using that space.
 
 ### Current Behavior
-
-[What actually happens?]
+As soon as a long placeholder appears (for example, after clicking a suggestion card), it's forced onto a single line and cut off almost immediately with "...", even though the box has room below it for more lines.
 
 ### Affected Components
-
-[Which parts of the codebase are involved?]
+- `apps/web/src/styles/chat.css` — the `.composer-input-placeholder` CSS rule (the actual bug)
+- `apps/web/src/components/composer/LexicalComposerInput.tsx` — renders the placeholder element (structure is fine, no changes needed here)
 
 ---
 
 ## Reproduction Process
 
 ### Environment Setup
-
-[Notes on setting up your local development environment - challenges you faced, how you solved them]
+Set up Node 24 through fnm (had to fix my PowerShell profile so fnm could actually switch versions — it wasn't picking up until I added `fnm env --use-on-cd` to my `$PROFILE`), then used Corepack to get the pinned pnpm version (10.33.2). Ran `pnpm install` and `pnpm tools-dev run web`, and signed in using a Gemini API key (BYOK) since I don't have a local coding agent CLI installed.
 
 ### Steps to Reproduce
-
-1. [Step 1]
-2. [Step 2]
-3. [Observed result]
+1. Open a project (or design-system flow) and click one of the suggestion cards (e.g. "编辑风路演 PPT") to seed the composer with a long prompt.
+2. Look at the composer box right after it's seeded, before typing anything.
+3. Observed result: the text is cut off after one line with "...", even though there's empty space below it in the box.
 
 ### Reproduction Evidence
-
-- **Commit showing reproduction:** [Link to commit in your fork]
-- **Screenshots/logs:** [If applicable]
-- **My findings:** [What you discovered during reproduction]
+- **Commit showing reproduction:** _(not yet — will link once branch is created)_
+- **Screenshots/logs:** Captured a screenshot of the composer showing the clipped placeholder text, plus a DevTools screenshot confirming the exact CSS on `.composer-input-placeholder` (`white-space: nowrap`, `text-overflow: ellipsis`, `overflow: hidden`, no `max-height`).
+- **My findings:** Confirmed the bug is isolated to the placeholder overlay, not the real editable text (which already wraps/scrolls correctly). Also confirmed this isn't a duplicate of issue #2084, since that one's fix only touched the real textarea's auto-resize, not the placeholder.
 
 ---
 
 ## Solution Approach
 
 ### Analysis
-
-[Your analysis of the root cause - what's causing the issue?]
+The placeholder is a separate floating element (`position: absolute`) sitting on top of the real input, not inside the same scrollable container the real typed text uses. Its CSS forces `white-space: nowrap`, which stops it from wrapping at all, and it has no `max-height`, so simply removing that one property would let it grow past the bottom of the box instead of behaving nicely.
 
 ### Proposed Solution
-
-[High-level description of your fix approach]
+Let the placeholder wrap across multiple lines like the real input does, but keep it inside the same visible height as the box. If the text is still too long after filling that space, cut it off gracefully with "..." at the end — no separate scrollbar needed.
 
 ### Implementation Plan
 
-Using UMPIRE framework (adapted):
+**Understand:** The placeholder truncates too aggressively (one line) instead of using the box's available space.
 
-**Understand:** [Restate the problem]
+**Match:** The real editable text area (`.composer-input-editor`) already handles long content well, using `max-height: min(184px, 34vh)`. The placeholder should follow that same height limit. (Note: `PlaceholderCarousel.tsx`'s rotating example text uses a similar single-line style on purpose — that one stays as-is.)
 
-**Match:** [What similar patterns/solutions exist in the codebase?]
+**Plan:**
+1. In `chat.css`, remove `white-space: nowrap` from `.composer-input-placeholder` so it can wrap.
+2. Add a `max-height` to `.composer-input-placeholder` matching `.composer-input-editor`'s `min(184px, 34vh)`.
+3. Keep `text-overflow: ellipsis` and `overflow: hidden` as the fallback for when text still doesn't fully fit.
+4. Add a small test file (`apps/web/tests/styles/composer-input-placeholder.test.ts`) checking these two rules, following the existing CSS-contract test pattern used elsewhere in the repo.
 
-**Plan:** [Step-by-step implementation plan]
-1. [Modify file X to do Y]
-2. [Add function Z]
-3. [Update tests]
+**Implement:** https://github.com/Kameti77/open-design/tree/fix-issues-5370
 
-**Implement:** [Link to your branch/commits as you work]
+**Review:** Self-check before opening the PR — single-quote style, English-only comments, one concern per PR (CSS-only, no unrelated changes), fill out the PR template fully, and clearly note that the home-page carousel text was reviewed and intentionally left unchanged.
 
-**Review:** [Self-review checklist - does it follow the project's contribution guidelines?]
-
-**Evaluate:** [How will you verify it works?]
-
+**Evaluate:** Run the new test (`pnpm vitest run -c vitest.config.ts tests/styles/composer-input-placeholder.test.ts`), plus manually recheck the fix in the browser — confirm the placeholder wraps across a few lines, stays inside the box without overlapping other UI, and only shows "..." if it's genuinely still too long.
 ---
 
 ## Testing Strategy
